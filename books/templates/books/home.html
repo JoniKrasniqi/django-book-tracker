@@ -1,0 +1,379 @@
+{% extends 'books/base.html' %}
+
+{% block title %}Book Tracker - Home{% endblock %}
+
+{% block content %}
+<!-- Dashboard Stats -->
+<div class="dashboard-stats">
+    <h2 class="mb-4">Dashboard</h2>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <h5>Total Books</h5>
+                <h3 class="text-primary">{{ total_books }}</h3>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <h5>Scraped Books</h5>
+                <h3 class="text-success">{{ scraped_books }}</h3>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <h5>Manually Added</h5>
+                <h3 class="text-info">{{ manual_books }}</h3>
+            </div>
+        </div>
+    </div>
+
+    {% if user.is_superuser and top_contributors %}
+    <h4 class="mt-4 mb-3">Top Contributors</h4>
+    <div class="row">
+        {% for contributor in top_contributors %}
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <h6>{{ contributor.created_by__username }}</h6>
+                <p class="mb-0">{{ contributor.book_count }} books</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Book List -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>My Books</h3>
+        <div class="search-box">
+            <div class="input-group">
+                <input type="text" id="search-input" class="form-control" placeholder="Search books..." value="{{ query }}">
+                <div class="input-group-append">
+                    <button class="btn btn-outline-secondary" type="button" id="search-button">
+                        <i class="fa fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="loading-spinner" class="text-center my-3" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading books...</p>
+        </div>
+        <div class="table-responsive" id="books-container">
+            <table class="table table-striped" id="books-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <a href="javascript:void(0)" class="sort-link" data-sort="title">
+                                Title 
+                                {% if sort_by == 'title' %}
+                                <i class="fas fa-sort-up text-primary"></i>
+                                {% elif sort_by == '-title' %}
+                                <i class="fas fa-sort-down text-primary"></i>
+                                {% else %}
+                                <i class="fas fa-sort text-secondary"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="javascript:void(0)" class="sort-link" data-sort="price">
+                                Price 
+                                {% if sort_by == 'price' %}
+                                <i class="fas fa-sort-up text-primary"></i>
+                                {% elif sort_by == '-price' %}
+                                <i class="fas fa-sort-down text-primary"></i>
+                                {% else %}
+                                <i class="fas fa-sort text-secondary"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="javascript:void(0)" class="sort-link" data-sort="stock">
+                                Stock 
+                                {% if sort_by == 'stock' %}
+                                <i class="fas fa-sort-up text-primary"></i>
+                                {% elif sort_by == '-stock' %}
+                                <i class="fas fa-sort-down text-primary"></i>
+                                {% else %}
+                                <i class="fas fa-sort text-secondary"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>UPC</th>
+                        <th>
+                            <a href="javascript:void(0)" class="sort-link" data-sort="reviews">
+                                Reviews 
+                                {% if sort_by == 'reviews' %}
+                                <i class="fas fa-sort-up text-primary"></i>
+                                {% elif sort_by == '-reviews' %}
+                                <i class="fas fa-sort-down text-primary"></i>
+                                {% else %}
+                                <i class="fas fa-sort text-secondary"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        {% if user.is_superuser %}
+                        <th>Added By</th>
+                        {% endif %}
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in page_obj %}
+                    <tr>
+                        <td>{{ book.title }}</td>
+                        <td>${{ book.price }}</td>
+                        <td>{{ book.stock }}</td>
+                        <td>{{ book.upc }}</td>
+                        <td>{{ book.reviews }}</td>
+                        {% if user.is_superuser %}
+                        <td>{{ book.created_by.username }}</td>
+                        {% endif %}
+                        <td>
+                            <a href="{% url 'edit_book' book.id %}" class="btn btn-sm btn-warning">Edit</a>
+                            <a href="{% url 'delete_book' book.id %}" class="btn btn-sm btn-danger">Delete</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if user.is_superuser %}7{% else %}6{% endif %}" class="text-center">
+                            No books found. Start by <a href="{% url 'add_book' %}">adding</a> or <a href="{% url 'scrape_books' %}">scraping</a> some books!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if query %}&search={{ query }}{% endif %}">&laquo; First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&search={{ query }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if query %}&search={{ query }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&search={{ query }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&search={{ query }}{% endif %}">Last &raquo;</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        let typingTimer;
+        const doneTypingInterval = 500;
+        
+        // Initialize current state
+        let currentSort = '{{ sort_by }}';
+        let currentQuery = '{{ query }}';
+        let currentPage = {{ page_obj.number|default:1 }};
+        
+        // Add click handlers for sorting
+        $('.sort-link').on('click', function() {
+            const sortField = $(this).data('sort');
+            
+            // Toggle sort direction if clicking on the same field
+            if (currentSort === sortField) {
+                currentSort = '-' + sortField;
+            } else if (currentSort === '-' + sortField) {
+                currentSort = sortField;
+            } else {
+                currentSort = sortField;
+            }
+            
+            performAjaxSearch(currentQuery, currentSort, 1);
+        });
+        
+        // Search input handlers
+        $('#search-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                currentQuery = $(this).val();
+                performAjaxSearch(currentQuery, currentSort, 1);
+                return;
+            }
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(function() {
+                currentQuery = $('#search-input').val();
+                performAjaxSearch(currentQuery, currentSort, 1);
+            }, doneTypingInterval);
+        });
+        
+        $('#search-input').on('keydown', function() {
+            clearTimeout(typingTimer);
+        });
+        
+        $('#search-button').on('click', function() {
+            currentQuery = $('#search-input').val();
+            performAjaxSearch(currentQuery, currentSort, 1);
+        });
+        
+        // Add handlers for pagination
+        $(document).on('click', '.pagination-link', function(e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            performAjaxSearch(currentQuery, currentSort, page);
+        });
+        
+        function performAjaxSearch(query, sort, page) {
+            // Save current state
+            currentQuery = query;
+            currentSort = sort;
+            currentPage = page;
+            
+            // Update URL with current state (without reloading page)
+            const url = new URL(window.location.href);
+            url.searchParams.set('search', query);
+            url.searchParams.set('sort', sort);
+            url.searchParams.set('page', page);
+            window.history.pushState({}, '', url);
+            
+            // Show loading spinner
+            $('#books-container').hide();
+            $('#loading-spinner').show();
+            
+            $.ajax({
+                url: '{% url "home" %}',
+                data: {
+                    'search': query,
+                    'sort': sort,
+                    'page': page
+                },
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(data) {
+                    updateBookTable(data.books);
+                    updatePagination(data);
+                },
+                error: function() {
+                    alert('An error occurred while searching. Please try again.');
+                },
+                complete: function() {
+                    // Hide loading spinner
+                    $('#loading-spinner').hide();
+                    $('#books-container').show();
+                }
+            });
+        }
+        
+        function updateBookTable(books) {
+            const tableBody = $('#books-table tbody');
+            tableBody.empty();
+            
+            if (books.length === 0) {
+                const colspan = {{ user.is_superuser|yesno:"7,6" }};
+                const emptyRow = `
+                    <tr>
+                        <td colspan="${colspan}" class="text-center">
+                            No books found. Start by <a href="{% url 'add_book' %}">adding</a> or <a href="{% url 'scrape_books' %}">scraping</a> some books!
+                        </td>
+                    </tr>
+                `;
+                tableBody.append(emptyRow);
+                return;
+            }
+            
+            books.forEach(function(book) {
+                let row = `<tr>
+                    <td>${book.title}</td>
+                    <td>$${book.price}</td>
+                    <td>${book.stock}</td>
+                    <td>${book.upc}</td>
+                    <td>${book.reviews}</td>`;
+                
+                if ({{ user.is_superuser|yesno:"true,false" }}) {
+                    row += `<td>${book.created_by}</td>`;
+                }
+                
+                row += `<td>
+                    <a href="/edit/${book.id}/" class="btn btn-sm btn-warning">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                    <a href="/delete/${book.id}/" class="btn btn-sm btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </a>
+                </td>
+                </tr>`;
+                
+                tableBody.append(row);
+            });
+        }
+        
+        function updatePagination(data) {
+            const paginationElement = $('.pagination');
+            if (!paginationElement.length) return;
+            
+            paginationElement.empty();
+            
+            if (data.has_previous) {
+                paginationElement.append(`
+                    <li class="page-item">
+                        <a class="page-link pagination-link" href="#" data-page="1">&laquo; First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link pagination-link" href="#" data-page="${data.page_number - 1}">Previous</a>
+                    </li>
+                `);
+            }
+            
+            // Add page numbers
+            for (let i = 1; i <= data.total_pages; i++) {
+                if (i === data.page_number || 
+                    (i > data.page_number - 3 && i < data.page_number + 3)) {
+                    const activeClass = i === data.page_number ? 'active' : '';
+                    paginationElement.append(`
+                        <li class="page-item ${activeClass}">
+                            <a class="page-link pagination-link" href="#" data-page="${i}">${i}</a>
+                        </li>
+                    `);
+                }
+            }
+            
+            if (data.has_next) {
+                paginationElement.append(`
+                    <li class="page-item">
+                        <a class="page-link pagination-link" href="#" data-page="${data.page_number + 1}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link pagination-link" href="#" data-page="${data.total_pages}">Last &raquo;</a>
+                    </li>
+                `);
+            }
+        }
+    });
+</script>
+{% endblock %} 

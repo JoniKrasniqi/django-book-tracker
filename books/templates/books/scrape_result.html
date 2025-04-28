@@ -1,0 +1,78 @@
+{% extends 'books/base.html' %}
+
+{% block title %}Scrape Results{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header {% if success %}bg-success{% else %}bg-danger{% endif %} text-white">
+        <h3>Book Scraping Results</h3>
+    </div>
+    <div class="card-body">
+        {% if success %}
+        <div class="alert alert-success">
+            <h4 class="alert-heading">Success!</h4>
+            <p>Successfully scraped {{ books_count }} books from {{ pages_scraped }} page{% if pages_scraped != 1 %}s{% endif %}.</p>
+            <div class="progress mb-3">
+                <div class="progress-bar bg-success" role="progressbar" style="width: 0%">
+                    {{ pages_scraped }}/{{ total_pages }} pages
+                </div>
+            </div>
+        </div>
+        
+        {% if errors %}
+        <div class="alert alert-warning">
+            <h4 class="alert-heading">Warnings</h4>
+            <p>The following errors occurred during scraping:</p>
+            <div class="error-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+                <ul>
+                    {% for error in errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="alert alert-danger">
+            <h4 class="alert-heading">Error</h4>
+            <p>{{ message }}</p>
+            {% if errors %}
+            <div class="error-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+                <ul>
+                    {% for error in errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="mt-4">
+            <a href="{% url 'home' %}" class="btn btn-primary">
+                <i class="fas fa-home me-1"></i> Back to Book List
+            </a>
+            <a href="{% url 'scrape_books' %}" class="btn btn-outline-primary">
+                <i class="fas fa-sync me-1"></i> Try Again
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Calculate and update progress bar
+    window.onload = function() {
+        const progressBar = document.querySelector('.progress-bar');
+        if (progressBar) {
+            const pagesScraped = {{ pages_scraped|default:0 }};
+            const totalPages = {{ total_pages|default:1 }};
+            const percentage = (pagesScraped / totalPages) * 100;
+            progressBar.style.width = percentage + '%';
+            progressBar.setAttribute('aria-valuenow', percentage);
+        }
+    };
+</script>
+{% endblock %} 

@@ -1,0 +1,249 @@
+{% extends 'books/base.html' %}
+
+{% block title %}Scrape Books{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Scrape Books</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Initial Form -->
+                    <div id="scrape-form-container">
+                        <p class="mb-4">Click the button below to start scraping books from the website.</p>
+                        
+                        {% if user.is_superuser %}
+                            <div class="alert alert-info">
+                                As an admin, you can scrape pages 1-6 (approximately 120 books).
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                You are assigned to scrape the following pages: 
+                                {% for page in assigned_pages %}
+                                    {{ page }}{% if not forloop.last %}, {% endif %}
+                                {% empty %}
+                                    None. Please contact an admin to assign pages to you.
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <form id="scrape-form" method="post">
+                            {% csrf_token %}
+                            <button id="start-scrape-btn" type="button" class="btn btn-primary">
+                                <i class="fas fa-spider me-1"></i> Start Scraping
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Progress Display (initially hidden) -->
+                    <div id="scrape-progress-container" style="display: none;">
+                        <div class="text-center mb-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h4 id="status-message" class="mt-3">Initializing scraper...</h4>
+                        </div>
+                        
+                        <div class="progress mb-3">
+                            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%;" 
+                                 aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <span id="pages-progress">Pages: 0/0</span>
+                            <span id="books-progress">Books: 0</span>
+                        </div>
+                        
+                        <div id="error-container" class="mt-4" style="display: none;">
+                            <h5>Errors:</h5>
+                            <ul id="error-list" class="text-danger"></ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Display (initially hidden) -->
+                    <div id="scrape-results-container" style="display: none;">
+                        <div class="alert alert-success" id="success-message">
+                            Scraping completed successfully!
+                        </div>
+                        
+                        <div class="mt-3">
+                            <p><strong>Books scraped:</strong> <span id="books-count">0</span></p>
+                            <p><strong>Pages processed:</strong> <span id="pages-scraped">0</span></p>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a href="{% url 'home' %}" class="btn btn-primary">
+                                <i class="fas fa-book me-1"></i> Go to Book List
+                            </a>
+                            <button id="scrape-again-btn" class="btn btn-secondary">
+                                <i class="fas fa-redo me-1"></i> Scrape Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const startScrapeBtn = document.getElementById('start-scrape-btn');
+        const scrapeAgainBtn = document.getElementById('scrape-again-btn');
+        const formContainer = document.getElementById('scrape-form-container');
+        const progressContainer = document.getElementById('scrape-progress-container');
+        const resultsContainer = document.getElementById('scrape-results-container');
+        const progressBar = document.getElementById('progress-bar');
+        const statusMessage = document.getElementById('status-message');
+        const pagesProgress = document.getElementById('pages-progress');
+        const booksProgress = document.getElementById('books-progress');
+        const errorContainer = document.getElementById('error-container');
+        const errorList = document.getElementById('error-list');
+        const booksCount = document.getElementById('books-count');
+        const pagesScraped = document.getElementById('pages-scraped');
+        const successMessage = document.getElementById('success-message');
+        
+        let sessionId = null;
+        let pollInterval = null;
+        
+        // Function to start the scraping process
+        startScrapeBtn.addEventListener('click', function() {
+            // Show the progress container and hide the form
+            formContainer.style.display = 'none';
+            progressContainer.style.display = 'block';
+            resultsContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+            errorList.innerHTML = '';
+            
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Make AJAX request to start scraping
+            fetch('{% url "scrape_books" %}', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                sessionId = data.session_id;
+                statusMessage.textContent = 'Scraping in progress...';
+                
+                // Start polling for progress updates
+                pollInterval = setInterval(checkProgress, 1000);
+            })
+            .catch(error => {
+                statusMessage.textContent = 'Error starting scrape process';
+                console.error('Error:', error);
+            });
+        });
+        
+        // Function to check scraping progress
+        function checkProgress() {
+            if (!sessionId) return;
+            
+            fetch("{% url 'check_scrape_progress' session_id='placeholder' %}".replace('placeholder', sessionId), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update progress UI
+                if (data.total_pages > 0) {
+                    const progressPercent = Math.round((data.completed_pages / data.total_pages) * 100);
+                    progressBar.style.width = `${progressPercent}%`;
+                    progressBar.textContent = `${progressPercent}%`;
+                    progressBar.setAttribute('aria-valuenow', progressPercent);
+                    
+                    pagesProgress.textContent = `Pages: ${data.completed_pages}/${data.total_pages}`;
+                    booksProgress.textContent = `Books: ${data.books_scraped}`;
+                    
+                    if (data.current_page) {
+                        statusMessage.textContent = `Scraping page ${data.current_page}...`;
+                    }
+                }
+                
+                // Show any errors
+                if (data.errors && data.errors.length > 0) {
+                    errorContainer.style.display = 'block';
+                    errorList.innerHTML = '';
+                    
+                    data.errors.forEach(error => {
+                        const li = document.createElement('li');
+                        li.textContent = error;
+                        errorList.appendChild(li);
+                    });
+                }
+                
+                // Handle completion
+                if (data.finished) {
+                    clearInterval(pollInterval);
+                    
+                    // Show results
+                    progressContainer.style.display = 'none';
+                    resultsContainer.style.display = 'block';
+                    
+                    if (data.success) {
+                        successMessage.classList.remove('alert-danger');
+                        successMessage.classList.add('alert-success');
+                        successMessage.textContent = `Scraping completed successfully!`;
+                    } else {
+                        successMessage.classList.remove('alert-success');
+                        successMessage.classList.add('alert-danger');
+                        successMessage.textContent = data.message || 'Scraping completed with errors.';
+                    }
+                    
+                    booksCount.textContent = data.books_count || 0;
+                    pagesScraped.textContent = data.completed_pages || 0;
+                    
+                    // Transfer errors to results if any
+                    if (data.errors && data.errors.length > 0) {
+                        const resultErrorContainer = document.createElement('div');
+                        resultErrorContainer.classList.add('mt-4');
+                        resultErrorContainer.innerHTML = '<h5>Errors encountered:</h5>';
+                        
+                        const errorUl = document.createElement('ul');
+                        errorUl.classList.add('text-danger');
+                        
+                        data.errors.forEach(error => {
+                            const li = document.createElement('li');
+                            li.textContent = error;
+                            errorUl.appendChild(li);
+                        });
+                        
+                        resultErrorContainer.appendChild(errorUl);
+                        resultsContainer.appendChild(resultErrorContainer);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking progress:', error);
+                // If there's an error with the progress check, we'll stop polling
+                clearInterval(pollInterval);
+                statusMessage.textContent = 'Error tracking progress';
+            });
+        }
+        
+        // Reset the form for scraping again
+        scrapeAgainBtn.addEventListener('click', function() {
+            formContainer.style.display = 'block';
+            resultsContainer.style.display = 'none';
+            
+            // Remove any added error containers
+            const addedErrorContainers = resultsContainer.querySelectorAll('div:not(.alert):not(.mt-3):not(.mt-4)');
+            addedErrorContainers.forEach(container => container.remove());
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,178 @@
+{% extends 'books/base.html' %}
+
+{% block title %}{% if form.instance.id %}Edit Book{% else %}Add Book{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header {% if form.instance.id %}bg-warning{% else %}bg-primary{% endif %} text-white">
+        <h3>
+            {% if form.instance.id %}
+            <i class="fas fa-edit me-2"></i>Edit Book
+            {% else %}
+            <i class="fas fa-plus-circle me-2"></i>Add New Book
+            {% endif %}
+        </h3>
+    </div>
+    <div class="card-body">
+        <form method="post" id="book-form" novalidate>
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.title.errors }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.title.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.price.id_for_label }}" class="form-label">Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.price }}
+                        </div>
+                        {% if form.price.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.price.errors }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.price.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.stock.id_for_label }}" class="form-label">Quantity in Stock</label>
+                        {{ form.stock }}
+                        {% if form.stock.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.stock.errors }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.stock.help_text }}</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ form.upc.id_for_label }}" class="form-label">UPC/ISBN</label>
+                        {{ form.upc }}
+                        {% if form.upc.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.upc.errors }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.upc.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.reviews.id_for_label }}" class="form-label">Number of Reviews</label>
+                        {{ form.reviews }}
+                        {% if form.reviews.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.reviews.errors }}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.reviews.help_text }}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.description.errors }}
+                </div>
+                {% endif %}
+                <div class="form-text">{{ form.description.help_text }}</div>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% url 'home' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Cancel
+                </a>
+                <button type="submit" id="submit-btn" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Client-side form validation
+        $('#book-form').on('submit', function(e) {
+            let isValid = true;
+            
+            // Validate title
+            if (!$('#{{ form.title.id_for_label }}').val().trim()) {
+                $('#{{ form.title.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.title.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            // Validate price
+            const price = parseFloat($('#{{ form.price.id_for_label }}').val());
+            if (isNaN(price) || price < 0) {
+                $('#{{ form.price.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.price.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            // Validate stock
+            const stock = parseInt($('#{{ form.stock.id_for_label }}').val());
+            if (isNaN(stock) || stock < 0) {
+                $('#{{ form.stock.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.stock.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            // Validate description
+            if (!$('#{{ form.description.id_for_label }}').val().trim()) {
+                $('#{{ form.description.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.description.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            // Validate UPC
+            if (!$('#{{ form.upc.id_for_label }}').val().trim()) {
+                $('#{{ form.upc.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.upc.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            // Validate reviews
+            const reviews = parseInt($('#{{ form.reviews.id_for_label }}').val());
+            if (isNaN(reviews) || reviews < 0) {
+                $('#{{ form.reviews.id_for_label }}').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#{{ form.reviews.id_for_label }}').removeClass('is-invalid');
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+                $('html, body').animate({
+                    scrollTop: $('.is-invalid:first').offset().top - 100
+                }, 200);
+            } else {
+                // Disable submit button to prevent double submission
+                $('#submit-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Saving...');
+            }
+        });
+    });
+</script>
+{% endblock %} 
